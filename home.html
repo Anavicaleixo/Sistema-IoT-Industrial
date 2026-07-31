@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <title>Monitor de Temperatura IoT</title>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      font-family: Arial, sans-serif;
+      background: #a0b0d7;
+      color: white;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .card {
+      background: #011c48;
+      padding: 40px;
+      border-radius: 16px;
+      text-align: center;
+      box-shadow: 0 20px 60px rgba(255, 255, 255, 0.6);
+      max-width: 500px;
+      width: 100%;
+      margin-bottom: 30px;
+    }
+    #temperatura {
+      font-size: 64px;
+      font-weight: bold;
+      color: #38bdf8;
+      margin: 20px 0;
+    }
+    #status {
+      font-size: 14px;
+      color: #94a3b8;
+    }
+
+
+    #security-status {
+      margin-top: 20px;
+      padding: 12px;
+      border-radius: 8px;
+      font-weight: bold;
+      display: none;
+    }
+    #security-status.normal {
+      display: block;
+      background: #064e3b;
+      color: #6ee7b7;
+      border: 1px solid #065f46;
+    }
+    #security-status.atencao {
+      display: block;
+      background: #713f12;
+      color: #fcd34d;
+      border: 1px solid #854d0e;
+    }
+    #security-status.critico {
+      display: block;
+      background: #7f1d1d;
+      color: #fca5a5;
+      border: 1px solid #991b1b;
+    }
+    #security-status .desc {
+      font-weight: normal;
+      font-size: 14px;
+      opacity: 0.8;
+      margin-top: 4px;
+    }
+
+    footer {
+        margin: 50px;
+      background: #011c48;
+      padding: 24px 30px;
+      border-radius: 16px;
+      max-width: 500px;
+      width: 100%;
+      text-align: center;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+      border-top: 3px solid #38bdf8; 
+      margin-top: 10px;
+    }
+    footer p {
+      color: #94a3b8;
+      font-size: 14px;
+      line-height: 1.6;
+      margin-bottom: 12px;
+    }
+    footer .tecnologias {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 8px;
+      margin: 12px 0;
+    }
+    footer .tecnologias span {
+      background: #0f172a;
+      padding: 4px 14px;
+      border-radius: 20px;
+      font-size: 12px;
+      color: #94a3b8;
+      border: 1px solid #334155;
+    }
+    .btn-sair {
+      background: #ef4444;
+      color: white;
+      border: none;
+      padding: 10px 28px;
+      border-radius: 8px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: background 0.2s;
+      margin-top: 10px;
+      font-size: 15px;
+    }
+    .btn-sair:hover {
+      background: #dc2626;
+    }
+    footer strong {
+      color: #38bdf8;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="card">
+    <h1>Monitor IoT</h1>
+    <p>Temperatura em Tempo Real</p>
+
+    <div id="temperatura">-- °C</div>
+    <div id="status">Desconectado</div>
+
+    <div id="security-status">
+      <span id="security-icon"></span>
+      <span id="security-text"></span>
+      <div class="desc" id="security-desc"></div>
+    </div>
+  </div>
+
+  <footer>
+    <p>
+      <strong> Sobre o Projeto</strong><br>
+      Monitoramento de temperatura industrial em tempo real via MQTT.
+      Dados coletados por ESP32 e exibidos nesta interface.
+    </p>
+    <div class="tecnologias">
+      <span>HTML5</span>
+      <span>CSS3</span>
+      <span>JavaScript</span>
+      <span>MQTT</span>
+      <span>Supabase</span>
+      <span>ESP32</span>
+    </div>
+   <button class="btn-sair" id="btnSair">
+   Sair
+</button>
+  </footer>
+
+  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+  <script>
+
+    const SUPABASE_URL = 'https://yheryzzihrndpmckdylm.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InloZXJ5enppaHJuZHBtY2tkeWxtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU1MDExNTIsImV4cCI6MjEwMTA3NzE1Mn0.B11x7tqcUhfJPWHsqs3IyhSmA0ZKbLiA5MfkHoWEXec';
+           const supabaseClient = window.supabase.createClient('https://yheryzzihrndpmckdylm.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InloZXJ5enppaHJuZHBtY2tkeWxtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU1MDExNTIsImV4cCI6MjEwMTA3NzE1Mn0.B11x7tqcUhfJPWHsqs3IyhSmA0ZKbLiA5MfkHoWEXec');
+
+
+   document.getElementById('btnSair').addEventListener('click', async () => {
+  await supabaseClient.auth.signOut();
+  window.location.href = 'login.html';
+});
+
+    const statusEl = document.getElementById("status");
+    const tempEl = document.getElementById("temperatura");
+    const securityDiv = document.getElementById("security-status");
+    const securityIcon = document.getElementById("security-icon");
+    const securityText = document.getElementById("security-text");
+    const securityDesc = document.getElementById("security-desc");
+
+    function updateSecurity(tempValue) {
+      const temp = parseFloat(tempValue);
+      if (isNaN(temp)) {
+        securityDiv.style.display = 'none';
+        return;
+      }
+      let text, desc, className;
+      if (temp < 25) {
+        text = 'Normal';
+        desc = 'Ambiente operando em condição segura';
+        className = 'normal';
+      } else if (temp >= 25 && temp <= 40) {
+        text = 'Atenção';
+        desc = 'Temperatura elevada – monitorar';
+        className = 'atencao';
+      } else {
+        text = 'Crítico';
+        desc = 'Risco operacional – ação necessária';
+        className = 'critico';
+      }
+      securityIcon.textContent = icon + ' ';
+      securityText.textContent = text;
+      securityDesc.textContent = desc;
+      securityDiv.className = 'security-status ' + className;
+    }
+
+    const client = mqtt.connect("wss://broker.emqx.io:8084/mqtt");
+
+    client.on("connect", () => {
+      statusEl.innerText = "Conectado ao Broker";
+      client.subscribe("iot/temperaturanavic");
+    });
+
+    client.on("message", (topic, message) => {
+      const temperatura = message.toString();
+      tempEl.innerText = temperatura + " °C";
+      updateSecurity(temperatura);
+    });
+
+    client.on("error", (err) => {
+      statusEl.innerText = "Erro na conexão";
+      console.error(err);
+    });
+  </script>
+</body>
+</html>
