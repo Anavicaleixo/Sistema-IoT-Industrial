@@ -218,7 +218,7 @@
 
     client.on("connect", () => {
       statusEl.innerText = "Conectado ao Broker";
-      client.subscribe("iot/temperaturanavic");
+      client.subscribe("iot/temperaturamanuela");
     });
 
     client.on("message", (topic, message) => {
